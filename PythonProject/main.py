@@ -10,6 +10,8 @@ def prepare_matrix(matrixA, vectorB):
     if len(vectorB) != n:
         raise ValueError("גודל וקטור B חייב להתאים לגודל המטריצה")
 
+    A = [[float(x) for x in row] for row in matrixA]
+
     b = []
     for item in vectorB:
         if isinstance(item, list):
@@ -17,37 +19,58 @@ def prepare_matrix(matrixA, vectorB):
         else:
             b.append(float(item))
 
-    A = []
-    for row in matrixA:
-        A.append([float(x) for x in row])
-
     def is_diagonally_dominant(mat):
         for i in range(len(mat)):
             diagonal = abs(mat[i][i])
-            others_sum = 0
-            for j in range(len(mat)):
-                if i != j:
-                    others_sum += abs(mat[i][j])
+            others_sum = sum(abs(mat[i][j]) for j in range(len(mat)) if j != i)
             if diagonal < others_sum:
                 return False
         return True
 
-
     if is_diagonally_dominant(A):
         return A, b, True, True
 
-
     for perm in permutations(range(n)):
-        new_A = []
-        new_b = []
-        for i in perm:
-            new_A.append(A[i][:])
-            new_b.append(b[i])
+        new_A = [A[i][:] for i in perm]
+        new_b = [b[i] for i in perm]
 
         if is_diagonally_dominant(new_A):
             return new_A, new_b, True, False
 
     return A, b, False, False
+
+
+def jacobi(matrixA, vectorB, tolerance=0.00001, max_iterations=100):
+    n = len(matrixA)
+    x_old = [0.0] * n
+    x_new = [0.0] * n
+
+    for iteration in range(1, max_iterations + 1):
+        for i in range(n):
+            if matrixA[i][i] == 0:
+                raise ZeroDivisionError("אי אפשר לחלק ב-0 על האלכסון הראשי")
+
+            sigma = 0.0
+            for j in range(n):
+                if j != i:
+                    sigma += matrixA[i][j] * x_old[j]
+
+            x_new[i] = (vectorB[i] - sigma) / matrixA[i][i]
+
+        print(f"איטרציה {iteration}: {x_new}")
+
+        max_error = 0.0
+        for i in range(n):
+            current_error = abs(x_new[i] - x_old[i])
+            if current_error > max_error:
+                max_error = current_error
+
+        if max_error < tolerance:
+            return x_new[:], iteration, True
+
+        x_old = x_new[:]
+
+    return x_new[:], max_iterations, False
 
 
 def gauss_seidel(matrixA, vectorB, tolerance=0.00001, max_iterations=100):
@@ -58,6 +81,9 @@ def gauss_seidel(matrixA, vectorB, tolerance=0.00001, max_iterations=100):
         old_x = x[:]
 
         for i in range(n):
+            if matrixA[i][i] == 0:
+                raise ZeroDivisionError("אי אפשר לחלק ב-0 על האלכסון הראשי")
+
             sum_before = 0.0
             sum_after = 0.0
 
@@ -66,9 +92,6 @@ def gauss_seidel(matrixA, vectorB, tolerance=0.00001, max_iterations=100):
 
             for j in range(i + 1, n):
                 sum_after += matrixA[i][j] * old_x[j]
-
-            if matrixA[i][i] == 0:
-                raise ZeroDivisionError("אי אפשר לחלק ב-0 על האלכסון הראשי")
 
             x[i] = (vectorB[i] - sum_before - sum_after) / matrixA[i][i]
 
@@ -81,12 +104,35 @@ def gauss_seidel(matrixA, vectorB, tolerance=0.00001, max_iterations=100):
                 max_error = current_error
 
         if max_error < tolerance:
-            return x, iteration, True
+            return x[:], iteration, True
 
-    return x, max_iterations, False
+    return x[:], max_iterations, False
 
 
+def run_method(method_name, method_function, A, B, has_dominant_diagonal):
+    print(f"\n--- {method_name} ---")
+
+    solution, iterations, converged = method_function(A, B)
+
+    print("פתרון סופי:", solution)
+    print("מספר איטרציות:", iterations)
+
+    if has_dominant_diagonal:
+        if converged:
+            print("השיטה התכנסה.")
+        else:
+            print("השיטה לא התכנסה במסגרת מספר האיטרציות.")
+    else:
+        if converged:
+            print("למרות שאין אלכסון דומיננטי, התוצאות הן:", solution)
+        else:
+            print("המערכת אינה מתכנסת")
+
+
+# ======================
 # תוכנית ראשית
+# ======================
+
 matrixA = [[4, 2, 0],
            [2, 10, 4],
            [0, 4, 5]]
@@ -103,40 +149,15 @@ for row in A:
 
 print("וקטור B:")
 print(B)
-print()
 
 if has_dominant_diagonal:
     if was_originally_dominant:
-        print("המטריצה היא עם אלכסון דומיננטי.")
+        print("המטריצה הייתה בעלת אלכסון דומיננטי מההתחלה.")
     else:
-        print("המטריצה לא הייתה עם אלכסון דומיננטי, בוצעה החלפת שורות למטריצה עם אלכסון דומיננטי.")
-
-    result, iterations, converged = gauss_seidel(A, B)
-
-    if converged:
-        print()
-        print("התוצאות הן:")
-        for i in range(len(result)):
-            print(f"x{i + 1} = {result[i]}")
-        print(f"מספר האיטרציות שהתבצעו: {iterations}")
-    else:
-        print()
-        print("המערכת אינה מתכנסת.")
-        print(f"מספר האיטרציות שהתבצעו: {iterations}")
-
+        print("בוצע סידור שורות כדי לקבל אלכסון דומיננטי.")
 else:
-    print("לא התקבלה מטריצה עם אלכסון דומיננטי גם לאחר החלפת שורות.")
-    print("ננסה בכל זאת לפתור בעזרת גאוס זיידל עד למספר איטרציות מקסימלי.")
-    print()
+    print("לא ניתן להביא את המטריצה לצורה עם אלכסון דומיננטי.")
+    print("נריץ בכל זאת מספר איטרציות ונבדוק האם יש התכנסות.")
 
-    result, iterations, converged = gauss_seidel(A, B)
-
-    print()
-    if converged:
-        print("למטריצה שאין אלכסון דומיננטי התוצאות הן:")
-        for i in range(len(result)):
-            print(f"x{i + 1} = {result[i]}")
-        print(f"מספר האיטרציות שהתבצעו: {iterations}")
-    else:
-        print("המערכת אינה מתכנסת.")
-        print(f"מספר האיטרציות שהתבצעו: {iterations}")
+run_method("שיטת יעקובי", jacobi, A, B, has_dominant_diagonal)
+run_method("שיטת גאוס-זיידל", gauss_seidel, A, B, has_dominant_diagonal)
